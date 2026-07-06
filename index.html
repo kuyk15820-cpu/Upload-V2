@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GitHub Flexible Zip Uploader</title>
+    <title>GitHub Smart Zip Uploader</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
@@ -93,7 +93,7 @@
                     <div>ขนาดจริง: <span id="infoSize" class="text-white"></span></div>
                     <div class="text-blue-400 mt-1 flex items-center gap-1">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        ติดตั้งระบบรองรับ ZIP ทุกรูปแบบ (.yml)
+                        ติดตั้งระบบดึงไฟล์ย่อยมาหน้า Root อัตโนมัติ
                     </div>
                 </div>
             </div>
@@ -115,13 +115,13 @@
         const repoSelect = document.getElementById('repoSelect');
         const newRepoInputBox = document.getElementById('newRepoInputBox');
 
-        // ตัว Workflow YAML แบบปรับปรุงใหม่ให้ดักจับและขยายไฟล์นามสกุล .zip ใดๆ ก็ตามที่อัปเข้ามา
+        // ปรับปรุงสคริปต์ดึงไฟล์ในโฟลเดอร์ซ้อน ออกมาวางแผ่ไว้ที่ Root เสมอ
         const workflowYamlContent = `name: Auto Unzip Any Archive
 
 on:
   push:
     paths:
-      - '**.zip' # ตรวจจับไฟล์ .zip ทุกชื่อใน Repository
+      - '**.zip'
 
 permissions:
   contents: write
@@ -135,7 +135,6 @@ jobs:
 
       - name: Extract all zip files to Root
         run: |
-          # ค้นหาไฟล์ .zip ทั้งหมดในโฟลเดอร์หลักแล้วสั่งแตกไฟล์ออกมาไว้หน้าแรก
           for f in *.zip; do
             [ -e "$f" ] || continue
             echo "กำลังจัดการแตกไฟล์: $f"
@@ -143,12 +142,27 @@ jobs:
             rm "$f"
           done
 
-      - name: Check Strip Folder Logic
+      - name: Smart Flatten Folder Logic (Move Nested Contents to Root)
         run: |
-          if [ \$(ls -1q | wc -l) -eq 1 ] && [ -d */ ]; then
-             echo "พบโฟลเดอร์ซ้อนชั้นนอก.. กำลังขยับดึงไฟล์ออกมาไว้หน้าแรกให้"
-             mv */* ./ 2>/dev/null || true
-             rm -rf */
+          # ค้นหาดูว่าหลังจากแตกไฟล์แล้ว ใน Root มีโฟลเดอร์หลงเหลืออยู่ตัวเดียวหรือไม่
+          # (โดยไม่นับรวมโฟลเดอร์ระบบ .git และ .github)
+          TARGET_DIR=$(ls -d */ 2>/dev/null | grep -v -E '^(\.git|\.github)/$' | head -n 1)
+          
+          # เช็กจำนวนรายการทั้งหมดใน Root (ไม่นับ .git และ .github) 
+          # ถ้ามีโฟลเดอร์นั้นอยู่เพียงตัวเดียว แปลว่าไฟล์โดนหุ้มมา ให้ทำการดึงไฟล์ด้านในออกมาหน้าแรกทันที
+          TOTAL_ITEMS=$(ls -1d */ * 2>/dev/null | grep -v -E '^(\.git|\.github)' | wc -l)
+          
+          if [ ! -z "$TARGET_DIR" ] && [ "$TOTAL_ITEMS" -eq 1 ]; then
+             echo "ตรวจพบโฟลเดอร์หุ้มชั้นนอกสุด: $TARGET_DIR -> กำลังดึงไฟล์ภายในทั้งหมดขึ้นมาหน้า Root"
+             
+             # ย้ายไฟล์และโฟลเดอร์ย่อยทั้งหมดที่ซ่อนอยู่ข้างใน ออกมาไว้หน้า Root หลัก
+             mv "$TARGET_DIR"* ./ 2>/dev/null || true
+             mv "$TARGET_DIR".* ./ 2>/dev/null || true # สำหรับย้ายพวกไฟล์ซ่อนอย่าง .gitignore หรือ .env (ถ้ามี)
+             
+             # ลบโฟลเดอร์เปล่าต้นทางทิ้ง
+             rm -rf "$TARGET_DIR"
+          else
+             echo "โครงสร้างไฟล์ถูกต้องอยู่แล้ว หรือมีไฟล์อื่นๆ ร่วมด้วย ไม่จำเป็นต้อง Flatten"
           fi
 
       - name: Commit and Push Changes back to Repo
@@ -157,7 +171,7 @@ jobs:
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .
           if ! git diff-index --quiet HEAD; then
-            git commit -m "Unpack user zip contents and clean archive via Dynamic Automation Workflow"
+            git commit -m "Unpack and flatten archive contents to root directory"
             git push
           else
             echo "ไม่มีการเปลี่ยนแปลงโครงสร้างไฟล์เพิ่มเติม"
@@ -244,7 +258,7 @@ jobs:
             localStorage.setItem('gh_branch', branch);
 
             const file = zipFileInput.files[0];
-            const fileName = file.name; // ดึงชื่อไฟล์จริงที่ผู้ใช้เลือกมาใช้งานแบบไดนามิก
+            const fileName = file.name;
             
             infoName.innerText = fileName;
             infoSize.innerText = formatBytes(file.size);
@@ -270,7 +284,6 @@ jobs:
                     await new Promise(r => setTimeout(r, 3000));
                 }
 
-                // สแกนตรวจสอบและอัปเดตตัว Workflow .yml ให้อัตโนมัติในกรณีที่ยังไม่มีในกิ่งงาน
                 submitBtn.innerText = 'กำลังตรวจสอบคิวงาน GitHub Workflow...';
                 const workflowPath = '.github/workflows/unzip.yml';
 
@@ -286,7 +299,7 @@ jobs:
                         method: 'PUT',
                         headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            message: 'Setup flexible generic automatic Unzip Workflow',
+                            message: 'Setup flexible smart flatten automatic Unzip Workflow',
                             content: b64Workflow,
                             branch: branch
                         })
@@ -317,7 +330,7 @@ jobs:
                     method: 'PUT',
                     headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        message: `Upload ${fileName} via Dynamic Web Interface`,
+                        message: `Upload ${fileName} via Smart Flatten Interface`,
                         content: base64Content,
                         branch: branch,
                         sha: currentSha
