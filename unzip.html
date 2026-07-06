@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Actions Installer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #0d1117;
+            color: #c9d1d9;
+        }
+        .glass-card {
+            background: rgba(22, 27, 34, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(48, 54, 61, 0.8);
+        }
+        .select-wrapper {
+            position: relative;
+        }
+        .select-arrow {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%) rotate(0deg);
+            transition: transform 0.2s ease;
+            pointer-events: none;
+        }
+        .select-wrapper.active .select-arrow {
+            transform: translateY(-50%) rotate(1800deg);
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <div class="glass-card w-full max-w-lg rounded-2xl p-6 shadow-2xl">
+        <h2 class="text-2xl font-bold mb-2 text-center text-white flex items-center justify-center gap-2">
+            <svg class="w-7 h-7 text-white" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+            Workflow Installer
+        </h2>
+        <p class="text-xs text-center text-gray-400 mb-6">เครื่องมือสำหรับติดตั้งไฟล์ควบคุม unzip.yml ไปยัง GitHub</p>
+
+        <form id="uploadForm" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium mb-1 text-gray-400">GitHub Username</label>
+                <input type="text" id="username" required value="kuyk15820-cpu" placeholder="เช่น Octocat"
+                    class="w-full px-4 py-2 rounded-lg bg-[#21262d] border border-[#30363d] focus:border-blue-500 focus:outline-none text-white">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium mb-1 text-gray-400">GitHub Token (Classic or Fine-Grained)</label>
+                <input type="password" id="token" required value="ghp_xxxxxxxxxxxxxxxxxxxx" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                    class="w-full px-4 py-2 rounded-lg bg-[#21262d] border border-[#30363d] focus:border-blue-500 focus:outline-none text-white">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium mb-1 text-gray-400">Select Repository</label>
+                <div class="select-wrapper w-full" id="repoSelectWrapper">
+                    <select id="repoSelect" onchange="toggleRepoInput()" onfocus="this.parentElement.classList.add('active')" onblur="this.parentElement.classList.remove('active')" class="w-full px-4 py-2 rounded-lg bg-[#21262d] border border-[#30363d] focus:border-blue-500 focus:outline-none text-white appearance-none cursor-pointer">
+                        <option value="">&lt; กรุณาเลือก Repository &gt;</option>
+                    </select>
+                    <svg class="select-arrow w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium mb-1 text-gray-400">Branch ที่ต้องการติดตั้ง</label>
+                <div class="select-wrapper" id="branchSelectWrapper">
+                    <select id="branch" onfocus="this.parentElement.classList.add('active')" onblur="this.parentElement.classList.remove('active')" onchange="this.parentElement.classList.remove('active')" class="w-full px-4 py-2 rounded-lg bg-[#21262d] border border-[#30363d] focus:border-blue-500 focus:outline-none text-white appearance-none cursor-pointer">
+                        <option value="main" selected>main</option>
+                        <option value="master">master</option>
+                    </select>
+                    <svg class="select-arrow w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </div>
+            </div>
+
+            <button type="button" id="submitBtn" onclick="installWorkflow()"
+                class="w-full mt-6 bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2.5 px-4 rounded-lg transition duration-200 shadow-md">
+                ติดตั้ง unzip.yml ไปยัง GitHub
+            </button>
+        </form>
+    </div>
+
+    <script>
+        const submitBtn = document.getElementById('submitBtn');
+        const repoSelect = document.getElementById('repoSelect');
+
+        // สคริปต์เนื้อหาของไฟล์ unzip.yml ที่จะอัปโหลดขึ้นไป
+        const yamlContent = `name: Unzip Any Project Files
+
+on:
+  push:
+    paths:
+      - '**/*.zip'
+
+jobs:
+  unzip-and-commit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Extract Any ZIP File
+        run: |
+          ZIP_FILE=$(find . -maxdepth 1 -name "*.zip" | head -n 1)
+          if [ -n "$ZIP_FILE" ]; then
+            echo "พบไฟล์ ZIP: $ZIP_FILE กำลังทำการแตกไฟล์..."
+            unzip -o "$ZIP_FILE" -d ./
+            rm "$ZIP_FILE"
+          else
+            echo "ไม่พบไฟล์ .zip ในโฟลเดอร์หลัก"
+            exit 0
+          fi
+
+      - name: Commit and Push Extracted Files
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          if ! git diff-index --quiet HEAD; then
+            git commit -m "Automated unzip: Extracted source files from dynamic web upload"
+            git push origin HEAD:\${{ github.ref_name }}
+          else
+            echo "No changes detected."
+          fi`;
+
+        document.getElementById('username').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); document.getElementById('token').focus(); }
+        });
+
+        document.getElementById('token').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); document.getElementById('repoSelect').focus(); }
+        });
+
+        function toggleRepoInput() {
+            document.getElementById('repoSelectWrapper').classList.remove('active');
+        }
+
+        async function fetchRepositories() {
+            const username = document.getElementById('username').value.trim();
+            const token = document.getElementById('token').value.trim();
+            if (!username || !token) return;
+
+            try {
+                const res = await fetch(`https://api.github.com/user/repos?per_page=100&sort=updated`, {
+                    headers: { 'Authorization': `token ${token}` }
+                });
+                if (res.ok) {
+                    const repos = await res.json();
+                    repoSelect.innerHTML = '<option value="">&lt; กรุณาเลือก Repository &gt;</option>';
+                    
+                    const savedRepo = localStorage.getItem('gh_repo');
+                    let foundSaved = false;
+
+                    repos.forEach(repoData => {
+                        const option = document.createElement('option');
+                        option.value = repoData.name;
+                        option.text = repoData.name;
+                        if (repoData.name === savedRepo) {
+                            option.selected = true;
+                            foundSaved = true;
+                        }
+                        repoSelect.appendChild(option);
+                    });
+                    toggleRepoInput();
+                }
+            } catch (err) {
+                console.error("Error fetching repositories:", err);
+            }
+        }
+
+        document.getElementById('username').addEventListener('change', fetchRepositories);
+        document.getElementById('token').addEventListener('change', fetchRepositories);
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            if (localStorage.getItem('gh_username')) document.getElementById('username').value = localStorage.getItem('gh_username');
+            if (localStorage.getItem('gh_token')) document.getElementById('token').value = localStorage.getItem('gh_token');
+            if (localStorage.getItem('gh_branch')) document.getElementById('branch').value = localStorage.getItem('gh_branch');
+            await fetchRepositories();
+        });
+
+        // ฟังก์ชันหัวใจหลักในการส่งไฟล์ขึ้นไปติดตั้งบนโครงสร้างโฟลเดอร์ .github/workflows/unzip.yml
+        async function installWorkflow() {
+            const username = document.getElementById('username').value.trim();
+            const token = document.getElementById('token').value.trim();
+            const repo = repoSelect.value;
+            const branch = document.getElementById('branch').value.trim() || 'main';
+
+            if (!username || !token || !repo) {
+                alert('กรุณากรอกข้อมูลและเลือก Repository ให้ครบถ้วนก่อนครับ');
+                return;
+            }
+
+            localStorage.setItem('gh_username', username);
+            localStorage.setItem('gh_token', token);
+            localStorage.setItem('gh_repo', repo);
+            localStorage.setItem('gh_branch', branch);
+
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'กำลังส่งคำสั่งติดตั้งไปยัง GitHub...';
+
+            const filePath = '.github/workflows/unzip.yml';
+
+            try {
+                // เช็กโครงสร้างไฟล์เดิมก่อน (หากมีเพื่อนำ SHA มาเขียนทับอัปเดต)
+                let fileSha = null;
+                const checkFile = await fetch(`https://api.github.com/repos/${username}/${repo}/contents/${filePath}?ref=${branch}`, {
+                    headers: { 'Authorization': `token ${token}` }
+                });
+                
+                if (checkFile.ok) {
+                    const fileData = await checkFile.json();
+                    fileSha = fileData.sha;
+                }
+
+                // เข้ารหัสเนื้อหาเป็น Base64
+                const base64Yaml = btoa(unescape(encodeURIComponent(yamlContent)));
+
+                // ทำการพ่นคำสั่งสร้างหรือแก้ไขไฟล์ขึ้น Repository
+                const uploadRes = await fetch(`https://api.github.com/repos/${username}/${repo}/contents/${filePath}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: "Configure unzip.yml Automated Workflow via Dashboard",
+                        content: base64Yaml,
+                        branch: branch,
+                        sha: fileSha
+                    })
+                });
+
+                if (uploadRes.ok) {
+                    submitBtn.innerText = '🎉 ติดตั้งระบบสำเร็จแล้วครับ!';
+                    alert('ติดตั้งไฟล์ควบคุมเรียบร้อย! ตอนนี้ระบบพร้อมแตกไฟล์ .zip ทุกตัวที่คุณส่งขึ้นไปแล้วครับ');
+                    setTimeout(() => { submitBtn.innerText = 'ติดตั้ง unzip.yml ไปยัง GitHub'; }, 3000);
+                } else {
+                    const errData = await uploadRes.json();
+                    throw new Error(errData.message);
+                }
+
+            } catch (err) {
+                alert('เกิดข้อผิดพลาดในการติดตั้ง: ' + err.message);
+                submitBtn.innerText = 'ติดตั้ง unzip.yml ไปยัง GitHub';
+            } finally {
+                submitBtn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
