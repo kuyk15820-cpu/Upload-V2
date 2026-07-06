@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Zip Uploader</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #0d1117;
+            color: #c9d1d9;
+        }
+        .glass-card {
+            background: rgba(22, 27, 34, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(48, 54, 61, 0.8);
+        }
+        /* สไตล์เสริมสำหรับการหมุนของลูกศรในช่อง Select */
+        .select-wrapper {
+            position: relative;
+        }
+        .select-arrow {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%) rotate(0deg);
+            transition: transform 0.2s ease;
+            pointer-events: none;
+        }
+        .select-wrapper.active .select-arrow {
+            transform: translateY(-50%) rotate(180deg);
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <div class="glass-card w-full max-w-lg rounded-2xl p-6 shadow-2xl">
+        <h2 class="text-2xl font-bold mb-6 text-center text-white flex items-center justify-center gap-2">
+            <svg class="w-7 h-7 text-white" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+            GitHub Uploader
+        </h2>
+
+        <form id="uploadForm" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium mb-1 text-gray-400">GitHub Username</label>
+                <input type="text" id="username" required value="kuyk15820-cpu" placeholder="เช่น Octocat"
+                    class="w-full px-4 py-2 rounded-lg bg-[#21262d] border border-[#30363d] focus:border-blue-500 focus:outline-none text-white">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium mb-1 text-gray-400">GitHub Token (Classic or Fine-Grained)</label>
+                <input type="password" id="token" required value="ghp_xxxxxxxxxxxxxxxxxxxx" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                    class="w-full px-4 py-2 rounded-lg bg-[#21262d] border border-[#30363d] focus:border-blue-500 focus:outline-none text-white">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium mb-1 text-gray-400">Select or Create Repository</label>
+                <div class="flex gap-2 w-full">
+                    <div class="select-wrapper flex-1" id="repoSelectWrapper">
+                        <select id="repoSelect" onchange="toggleRepoInput()" onfocus="this.parentElement.classList.add('active')" onblur="this.parentElement.classList.remove('active')" class="w-full px-4 py-2 rounded-lg bg-[#21262d] border border-[#30363d] focus:border-blue-500 focus:outline-none text-white appearance-none cursor-pointer">
+                            <option value="__NEW__">&lt; สร้าง Repository ใหม่ &gt;</option>
+                        </select>
+                        <svg class="select-arrow w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+                    <button type="button" id="deleteRepoBtn" onclick="deleteSelectedRepository()" class="px-3 py-2 rounded-lg bg-red-900 hover:bg-red-700 text-white transition font-semibold hidden flex items-center justify-center shadow-md" title="ลบ Repository นี้ถาวร">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                </div>
+            </div>
+
+            <div id="newRepoInputBox">
+                <label class="block text-sm font-medium mb-1 text-gray-400">Repository Name</label>
+                <input type="text" id="repo" placeholder="เช่น my-awesome-project"
+                    class="w-full px-4 py-2 rounded-lg bg-[#21262d] border border-[#30363d] focus:border-blue-500 focus:outline-none text-white">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium mb-1 text-gray-400">Branch</label>
+                <div class="select-wrapper" id="branchSelectWrapper">
+                    <select id="branch" onfocus="this.parentElement.classList.add('active')" onblur="this.parentElement.classList.remove('active')" onchange="this.parentElement.classList.remove('active')" class="w-full px-4 py-2 rounded-lg bg-[#21262d] border border-[#30363d] focus:border-blue-500 focus:outline-none text-white appearance-none cursor-pointer">
+                        <option value="main" selected>main</option>
+                        <option value="master">master</option>
+                    </select>
+                    <svg class="select-arrow w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </div>
+            </div>
+
+            <input type="file" id="zipFile" accept=".zip" class="hidden">
+
+            <div id="fileInfoBox" class="hidden p-3 rounded-lg bg-[#161b22] border border-[#30363d] text-sm text-gray-300">
+                <div class="flex items-center gap-2 mb-1 text-emerald-400 font-semibold">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    ข้อมูลไฟล์ที่เลือก:
+                </div>
+                <div class="font-mono text-xs space-y-0.5 pl-6">
+                    <div>ชื่อไฟล์: <span id="infoName" class="text-white"></span></div>
+                    <div>ขนาดไฟล์: <span id="infoSize" class="text-white"></span></div>
+                </div>
+            </div>
+
+            <button type="button" id="submitBtn" onclick="document.getElementById('zipFile').click()"
+                class="w-full mt-6 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 px-4 rounded-lg transition duration-200 shadow-md">
+                เลือกไฟล์ .zip เพื่อเริ่มทำงาน
+            </button>
+        </form>
+    </div>
+
+    <script>
+        const form = document.getElementById('uploadForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const zipFileInput = document.getElementById('zipFile');
+        const fileInfoBox = document.getElementById('fileInfoBox');
+        const infoName = document.getElementById('infoName');
+        const infoSize = document.getElementById('infoSize');
+        const repoSelect = document.getElementById('repoSelect');
+        const newRepoInputBox = document.getElementById('newRepoInputBox');
+        const deleteRepoBtn = document.getElementById('deleteRepoBtn');
+
+        // ฟังก์ชันช่วยจัดการข้ามไปยังช่องพิมพ์ถัดไปเมื่อกดปุ่ม Enter หรือ ถัดไป บนคีย์บอร์ด
+        document.getElementById('username').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('token').focus();
+            }
+        });
+
+        document.getElementById('token').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (repoSelect.value === '__NEW__') {
+                    document.getElementById('repo').focus();
+                } else {
+                    document.getElementById('repoSelect').focus();
+                }
+            }
+        });
+
+        document.getElementById('repo').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('branch').focus();
+            }
+        });
+
+        // ฟังก์ชันซ่อน/แสดง ฟิลด์กรอกชื่อกรณีสร้างใหม่ และคุมการแสดงปุ่มลบ
+        function toggleRepoInput() {
+            document.getElementById('repoSelectWrapper').classList.remove('active'); // บังคับคืนรูปทรงลูกศรหลังกดยืนยันตัวเลือก
+            if (repoSelect.value === '__NEW__') {
+                newRepoInputBox.classList.remove('hidden');
+                document.getElementById('repo').required = true;
+                deleteRepoBtn.classList.add('hidden');
+            } else {
+                newRepoInputBox.classList.add('hidden');
+                document.getElementById('repo').required = false;
+                document.getElementById('repo').value = repoSelect.value;
+                deleteRepoBtn.classList.remove('hidden');
+            }
+        }
+
+        // ฟังก์ชันดึงรายชื่อ Repository ทั้งหมดจาก GitHub
+        async function fetchRepositories() {
+            const username = document.getElementById('username').value.trim();
+            const token = document.getElementById('token').value.trim();
+            if (!username || !token) return;
+
+            try {
+                // ดึงรายชื่อ repos ทั้งแบบที่เป็นเจ้าของเองและองค์กร (สูงสุด 100 รายการ ล่าสุดก่อน)
+                const res = await fetch(`https://api.github.com/user/repos?per_page=100&sort=updated`, {
+                    headers: { 'Authorization': `token ${token}` }
+                });
+                if (res.ok) {
+                    const repos = await res.json();
+                    
+                    // เคลียร์ค่าตัวเลือกเก่า เหลือแค่สร้างใหม่ไว้
+                    repoSelect.innerHTML = '<option value="__NEW__">&lt; สร้าง Repository ใหม่ &gt;</option>';
+                    
+                    const savedRepo = localStorage.getItem('gh_repo');
+                    let foundSaved = false;
+
+                    repos.forEach(repoData => {
+                        const option = document.createElement('option');
+                        option.value = repoData.name;
+                        option.text = repoData.name;
+                        if (repoData.name === savedRepo) {
+                            option.selected = true;
+                            foundSaved = true;
+                        }
+                        repoSelect.appendChild(option);
+                    });
+
+                    if (foundSaved) {
+                        localStorage.setItem('gh_repo', savedRepo);
+                    }
+                    toggleRepoInput();
+                }
+            } catch (err) {
+                console.error("Error fetching repositories:", err);
+            }
+        }
+
+        // ฟังก์ชันสั่งลบ Repository ผ่าน API
+        async function deleteSelectedRepository() {
+            const username = document.getElementById('username').value.trim();
+            const token = document.getElementById('token').value.trim();
+            const selectedRepo = repoSelect.value;
+
+            if (selectedRepo === '__NEW__' || !selectedRepo) return;
+
+            const confirmDelete = confirm(`⚠️ คำเตือน: คุณแน่ใจหรือไม่ที่จะลบ Repository "${selectedRepo}" ทิ้งถาวร?\nการกระทำนี้ไม่สามารถย้อนกลับได้!`);
+            if (!confirmDelete) return;
+
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'กำลังลบ Repository...';
+
+            try {
+                const deleteRes = await fetch(`https://api.github.com/repos/${username}/${selectedRepo}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `token ${token}` }
+                });
+
+                if (deleteRes.ok || deleteRes.status === 204) {
+                    alert(`ลบ Repository "${selectedRepo}" เรียบร้อยแล้วครับ!`);
+                    localStorage.removeItem('gh_repo');
+                    await fetchRepositories();
+                } else {
+                    const errData = await deleteRes.json();
+                    alert(`เกิดข้อผิดพลาดในการลบ: [${deleteRes.status}] ${errData.message}\n(โปรดตรวจสอบว่า Token ของคุณได้รับสิทธิ์ "delete_repo" แล้วหรือไม่)`);
+                }
+            } catch (err) {
+                console.error(err);
+                alert('เกิดข้อผิดพลาดในการเชื่อมต่อระบบลบ');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerText = 'เลือกไฟล์ .zip เพื่อเริ่มทำงาน';
+            }
+        }
+
+        // เพิ่ม Event Listeners ตรวจจับเพื่อดึงข้อมูล Repo ทันทีที่มีการแก้ไขพิกัดข้อมูลผู้ใช้
+        document.getElementById('username').addEventListener('change', fetchRepositories);
+        document.getElementById('token').addEventListener('change', fetchRepositories);
+
+        // ฟังก์ชันโหลดค่าจาก localStorage เมื่อเปิดหน้าเว็บ
+        window.addEventListener('DOMContentLoaded', async () => {
+            if (localStorage.getItem('gh_username')) {
+                document.getElementById('username').value = localStorage.getItem('gh_username');
+            }
+            if (localStorage.getItem('gh_token')) {
+                document.getElementById('token').value = localStorage.getItem('gh_token');
+            }
+            if (localStorage.getItem('gh_branch')) {
+                document.getElementById('branch').value = localStorage.getItem('gh_branch');
+            }
+            
+            // เรียกทำงานดึงข้อมูลชุด Repo หลังจากเตรียมพิกัดบัญชีดั้งเดิมเรียบร้อยแล้ว
+            await fetchRepositories();
+            
+            if (repoSelect.value === '__NEW__' && localStorage.getItem('gh_repo')) {
+                document.getElementById('repo').value = localStorage.getItem('gh_repo');
+            }
+        });
+
+        // ฟังก์ชันช่วยจัดรูปแบบขนาดไฟล์
+        function formatBytes(bytes, decimals = 2) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+
+        // SVG Icons สำหรับ Toast Banner แต่ละสถานะแทนอีโมจิ
+        const icons = {
+            loading: `<svg class="w-4 h-4 inline-block mr-1.5 animate-spin text-blue-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`,
+            uploading: `<svg class="w-4 h-4 inline-block mr-1.5 animate-bounce text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>`,
+            success: `<svg class="w-4 h-4 inline-block mr-1.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`,
+            error: `<svg class="w-4 h-4 inline-block mr-1.5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`
+        };
+
+        // เมื่อมีการเลือกไฟล์ผ่านปุ่มทำงานทันที
+        zipFileInput.addEventListener('change', async (e) => {
+            if (zipFileInput.files.length === 0) return;
+            
+            // ตรวจสอบความพร้อมของข้อมูลในฟอร์มก่อนทำงาน
+            const username = document.getElementById('username').value.trim();
+            const token = document.getElementById('token').value.trim();
+            let repo = "";
+            
+            if (repoSelect.value === '__NEW__') {
+                repo = document.getElementById('repo').value.trim();
+            } else {
+                repo = repoSelect.value;
+            }
+            const branch = document.getElementById('branch').value.trim() || 'main';
+            
+            if (!username || !token || !repo) {
+                alert('กรุณากรอก Username, Token และ Repository Name ให้ครบถ้วนก่อนเลือกไฟล์ครับ');
+                zipFileInput.value = ''; // ล้างไฟล์ที่เลือก
+                fileInfoBox.classList.add('hidden');
+                return;
+            }
+
+            // บันทึกค่าลง localStorage ทันทีเมื่อตรวจสอบข้อมูลผ่านและเริ่มทำงาน
+            localStorage.setItem('gh_username', username);
+            localStorage.setItem('gh_token', token);
+            localStorage.setItem('gh_repo', repo);
+            localStorage.setItem('gh_branch', branch);
+
+            const file = zipFileInput.files[0];
+            const fileName = file.name;
+
+            // แสดงข้อมูลไฟล์ (File Info)
+            infoName.innerText = fileName;
+            infoSize.innerText = formatBytes(file.size);
+            fileInfoBox.classList.remove('hidden');
+
+            // ล้าง Log เดิมและปิดปุ่มชั่วคราว
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            try {
+                submitBtn.innerText = 'กำลังตรวจสอบ Repository...';
+                
+                // ตรวจสอบว่ามี Repository นี้อยู่แล้วหรือไม่ ถ้าไม่มีให้สร้างใหม่ทันที
+                const checkRepoRes = await fetch(`https://api.github.com/repos/${username}/${repo}`, {
+                    headers: { 'Authorization': `token ${token}` }
+                });
+                
+                if (checkRepoRes.status === 404) {
+                    submitBtn.innerText = 'ไม่พบ Repo.. กำลังสร้าง Repo ใหม่ให้...';
+                    const createRepoRes = await fetch(`https://api.github.com/user/repos`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `token ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            name: repo,
+                            private: false,
+                            auto_init: true // สร้างไฟล์ README เริ่มต้นเพื่อให้มีกิ่งหลักพร้อมใช้งานทันที
+                        })
+                    });
+                    
+                    if (!createRepoRes.ok) {
+                        const errData = await createRepoRes.json();
+                        throw new Error(`Create Repo Error: [${createRepoRes.status}] ${errData.message}`);
+                    }
+                    
+                    // หน่วงเวลารอให้ระบบเซิร์ฟเวอร์หลังบ้านของ GitHub จัดการสร้างโครงสร้างฐานข้อมูลสักครู่หนึ่ง
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    await fetchRepositories(); // อัปเดตเมนูเลือกให้มีชื่อ Repo ใหม่ตัวนี้เพิ่มเข้ามา
+                } else if (!checkRepoRes.ok) {
+                    const errData = await checkRepoRes.json();
+                    throw new Error(`Check Repo Error: [${checkRepoRes.status}] ${errData.message}`);
+                }
+
+                submitBtn.innerText = 'กำลังเตรียมอัปโหลดไฟล์ ZIP...';
+
+                // ตรวจสอบ SHA เก่าของไฟล์ชื่อนี้บน GitHub เผื่อกรณีเขียนทับชื่อเดิม
+                let fileSha = null;
+                const checkFile = await fetch(`https://api.github.com/repos/${username}/${repo}/contents/${fileName}?ref=${branch}`, {
+                    headers: { 'Authorization': `token ${token}` }
+                });
+                if (checkFile.ok) {
+                    const fileData = await checkFile.json();
+                    fileSha = fileData.sha;
+                }
+
+                // แปลงไฟล์เป็น Base64
+                const reader = new FileReader();
+                const base64Promise = new Promise((resolve) => {
+                    reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                    reader.readAsDataURL(file);
+                });
+                const base64Content = await base64Promise;
+
+                // อัปโหลดขึ้น GitHub ด้วยชื่อไฟล์นั้นๆ ตรงๆ เป็นก้อนเดียวผ่าน Contents API
+                submitBtn.innerText = `กำลังส่งไฟล์ ${fileName} ไปยัง GitHub...`;
+                const uploadRes = await fetch(`https://api.github.com/repos/${username}/${repo}/contents/${fileName}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: `Upload ${fileName} via Web Interface`,
+                        content: base64Content,
+                        branch: branch,
+                        sha: fileSha
+                    })
+                });
+
+                if (uploadRes.ok) {
+                    submitBtn.innerText = 'อัปโหลดสำเร็จแล้ว!';
+                    setTimeout(() => {
+                        submitBtn.innerText = 'เลือกไฟล์ .zip เพื่อเริ่มทำงาน';
+                    }, 3000);
+                } else {
+                    const errData = await uploadRes.json();
+                    throw new Error(`Upload Error: [${uploadRes.status}] ${errData.message}`);
+                }
+
+            } catch (err) {
+                submitBtn.innerText = 'เกิดข้อผิดพลาด';
+                console.error(err);
+                setTimeout(() => {
+                    submitBtn.innerText = 'เลือกไฟล์ .zip เพื่อเริ่มทำงาน';
+                }, 4000);
+            } finally {
+                zipFileInput.value = ''; // ล้างไฟล์เก่าออกเพื่อให้กดซ้ำไฟล์เดิมได้
+                resetButton();
+            }
+        });
+
+        function resetButton() {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+
+        // ฟังก์ชันเชื่อมต่อ GitHub API เดิมถูกตัดออกเนื่องจากย้ายไปใช้ Git Tree API ในการ Push แบบเป็นชุดสมบูรณ์แทน
+    </script>
+</body>
+</html>
