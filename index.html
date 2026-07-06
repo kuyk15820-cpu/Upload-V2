@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GitHub Smart Zip Uploader</title>
+    <title>GitHub Smart Zip Uploader v2</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
@@ -93,7 +93,7 @@
                     <div>ขนาดจริง: <span id="infoSize" class="text-white"></span></div>
                     <div class="text-blue-400 mt-1 flex items-center gap-1">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        ติดตั้งระบบดึงไฟล์ย่อยมาหน้า Root อัตโนมัติ
+                        แก้ไขระบบบังคับแกะไฟล์ย่อยมาหน้า Root (v2)
                     </div>
                 </div>
             </div>
@@ -115,7 +115,7 @@
         const repoSelect = document.getElementById('repoSelect');
         const newRepoInputBox = document.getElementById('newRepoInputBox');
 
-        // ปรับปรุงสคริปต์ดึงไฟล์ในโฟลเดอร์ซ้อน ออกมาวางแผ่ไว้ที่ Root เสมอ
+        // อัปเดตสคริปต์ดักจับโฟลเดอร์ย่อยที่มีชื่อเดียวกับตัว Zip เพื่อดึงเนื้อหาด้านในมาเทที่หน้าแรกแบบ 100%
         const workflowYamlContent = `name: Auto Unzip Any Archive
 
 on:
@@ -138,31 +138,38 @@ jobs:
           for f in *.zip; do
             [ -e "$f" ] || continue
             echo "กำลังจัดการแตกไฟล์: $f"
+            
+            # เก็บชื่อไฟล์ดั้งเดิมแบบไม่มีนามสกุล .zip (เช่น Troll) ไว้ใช้ตรวจสอบโฟลเดอร์ย่อย
+            FOLDER_NAME="\${f%.zip}"
+            
+            # แตกไฟล์ออกมาไว้ที่ root หลักตรงๆ
             unzip -o "$f" -d ./
             rm "$f"
+            
+            # ตรวจสอบว่าถ้าหากเกิดโฟลเดอร์ย่อยขึ้นมา (เช่นมีโฟลเดอร์ชื่อ Troll/ โผล่มาหลังแตกไฟล์)
+            if [ -d "$FOLDER_NAME" ]; then
+               echo "พบโฟลเดอร์ซ้อนชื่อ $FOLDER_NAME -> กำลังบังคับดึงไฟล์ภายในทั้งหมดออกมาที่หน้าแรก"
+               
+               # ดึงข้อมูลทุกอย่าง (รวมไฟล์ปกติและไฟล์ซ่อน) ออกมาที่หน้าแรกหลักของ Repo
+               mv "$FOLDER_NAME"/* ./ 2>/dev/null || true
+               mv "$FOLDER_NAME"/.* ./ 2>/dev/null || true
+               
+               # ลบตัวโฟลเดอร์เปล่าที่เหลือทิ้งไป
+               rm -rf "$FOLDER_NAME"
+            fi
           done
 
-      - name: Smart Flatten Folder Logic (Move Nested Contents to Root)
+      - name: Fallback Check (For any other single nested folder)
         run: |
-          # ค้นหาดูว่าหลังจากแตกไฟล์แล้ว ใน Root มีโฟลเดอร์หลงเหลืออยู่ตัวเดียวหรือไม่
-          # (โดยไม่นับรวมโฟลเดอร์ระบบ .git และ .github)
+          # บล็อกสำรอง: หากชื่อโฟลเดอร์ย่อยไม่ตรงกับชื่อ zip แต่แตกมาแล้วดันมีแค่โฟลเดอร์เปล่าๆ ตัวเดียวหุ้มอยู่
           TARGET_DIR=$(ls -d */ 2>/dev/null | grep -v -E '^(\.git|\.github)/$' | head -n 1)
+          NON_GIT_ITEMS=$(ls -1d */ * 2>/dev/null | grep -v -E '^(\.git|\.github)' | wc -l)
           
-          # เช็กจำนวนรายการทั้งหมดใน Root (ไม่นับ .git และ .github) 
-          # ถ้ามีโฟลเดอร์นั้นอยู่เพียงตัวเดียว แปลว่าไฟล์โดนหุ้มมา ให้ทำการดึงไฟล์ด้านในออกมาหน้าแรกทันที
-          TOTAL_ITEMS=$(ls -1d */ * 2>/dev/null | grep -v -E '^(\.git|\.github)' | wc -l)
-          
-          if [ ! -z "$TARGET_DIR" ] && [ "$TOTAL_ITEMS" -eq 1 ]; then
-             echo "ตรวจพบโฟลเดอร์หุ้มชั้นนอกสุด: $TARGET_DIR -> กำลังดึงไฟล์ภายในทั้งหมดขึ้นมาหน้า Root"
-             
-             # ย้ายไฟล์และโฟลเดอร์ย่อยทั้งหมดที่ซ่อนอยู่ข้างใน ออกมาไว้หน้า Root หลัก
+          if [ ! -z "$TARGET_DIR" ] && [ "$NON_GIT_ITEMS" -eq 1 ]; then
+             echo "Fallback: ตรวจพบโฟลเดอร์หุ้มชั้นนอกสุดชื่ออื่น: $TARGET_DIR -> กำลังเคลียร์ไฟล์ย่อยออกมา"
              mv "$TARGET_DIR"* ./ 2>/dev/null || true
-             mv "$TARGET_DIR".* ./ 2>/dev/null || true # สำหรับย้ายพวกไฟล์ซ่อนอย่าง .gitignore หรือ .env (ถ้ามี)
-             
-             # ลบโฟลเดอร์เปล่าต้นทางทิ้ง
+             mv "$TARGET_DIR".* ./ 2>/dev/null || true
              rm -rf "$TARGET_DIR"
-          else
-             echo "โครงสร้างไฟล์ถูกต้องอยู่แล้ว หรือมีไฟล์อื่นๆ ร่วมด้วย ไม่จำเป็นต้อง Flatten"
           fi
 
       - name: Commit and Push Changes back to Repo
@@ -171,7 +178,7 @@ jobs:
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .
           if ! git diff-index --quiet HEAD; then
-            git commit -m "Unpack and flatten archive contents to root directory"
+            git commit -m "Unpack and force flatten nested zip folder contents to root"
             git push
           else
             echo "ไม่มีการเปลี่ยนแปลงโครงสร้างไฟล์เพิ่มเติม"
@@ -284,28 +291,34 @@ jobs:
                     await new Promise(r => setTimeout(r, 3000));
                 }
 
+                // สแกนตรวจสอบและทำการอัปเดตไฟล์ .yml เวอร์ชั่นใหม่แก้ไขบั๊กตัวแปรนับไอเท็ม
                 submitBtn.innerText = 'กำลังตรวจสอบคิวงาน GitHub Workflow...';
                 const workflowPath = '.github/workflows/unzip.yml';
 
+                // ดึงค่า SHA ของไฟล์เดิมมาอัปเดตทับเพื่อเปลี่ยน Logic เป็น V2
+                let workflowSha = null;
                 const checkWorkflowRes = await fetch(`https://api.github.com/repos/${username}/${repo}/contents/${workflowPath}?ref=${branch}`, {
                     headers: { 'Authorization': `token ${token}` }
                 });
-
-                if (checkWorkflowRes.status === 404) {
-                    submitBtn.innerText = '⚙️ กำลังติดตั้งระบบแตกไฟล์อัตโนมัติ (.yml)...';
-                    const b64Workflow = btoa(unescape(encodeURIComponent(workflowYamlContent)));
-                    
-                    const createWorkflowRes = await fetch(`https://api.github.com/repos/${username}/${repo}/contents/${workflowPath}`, {
-                        method: 'PUT',
-                        headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            message: 'Setup flexible smart flatten automatic Unzip Workflow',
-                            content: b64Workflow,
-                            branch: branch
-                        })
-                    });
-                    if (!createWorkflowRes.ok) console.warn('คำเตือน: อัปโหลด Workflow ขัดข้องชั่วคราว');
+                if (checkWorkflowRes.ok) {
+                    const workflowData = await checkWorkflowRes.json();
+                    workflowSha = workflowData.sha;
                 }
+
+                // บังคับอัปเดตทับ หรือสร้างใหม่ถ้ายังไม่มีเพื่อให้ได้ชุดคำสั่งดึงไฟล์ตัวล่าสุด
+                submitBtn.innerText = '⚙️ กำลังติดตั้ง/อัปเดตระบบแตกไฟล์อัตโนมัติ (v2)...';
+                const b64Workflow = btoa(unescape(encodeURIComponent(workflowYamlContent)));
+                
+                const updateWorkflowRes = await fetch(`https://api.github.com/repos/${username}/${repo}/contents/${workflowPath}`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: 'Update and fix force flatten automatic Unzip Workflow v2',
+                        content: b64Workflow,
+                        branch: branch,
+                        sha: workflowSha
+                    })
+                });
 
                 submitBtn.innerText = `กำลังแปลงไฟล์ ${fileName} เป็น Base64...`;
                 const reader = new FileReader();
@@ -330,7 +343,7 @@ jobs:
                     method: 'PUT',
                     headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        message: `Upload ${fileName} via Smart Flatten Interface`,
+                        message: `Upload ${fileName} with target v2 workflow active`,
                         content: base64Content,
                         branch: branch,
                         sha: currentSha
